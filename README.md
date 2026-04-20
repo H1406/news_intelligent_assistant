@@ -1,319 +1,153 @@
-# Intelligent News Assistant – System Overview
+# Sports News Intelligent Assistant
+
+Lightweight Python project for the AI Engineer Intern technical test. It collects Vietnamese sports news from RSS feeds, filters the latest 7-day articles, extracts keywords, ranks highlights, generates summaries, and shows everything in an interactive dashboard.
+
+The implementation is intentionally simple:
+
+- `RSS` is the primary ingestion method
+- `requests + BeautifulSoup` is used to enrich article content
+- `Selenium` is supported as an optional fallback for dynamic pages
+- `SQLite` stores the normalized articles
+- `TF-IDF` extracts trending keywords
+- `Qwen/Qwen2.5-0.5B-Instruct` is the preferred LLM for summaries
+- An extractive fallback keeps the project runnable even without a local model
+- `Streamlit + Plotly` provides the dashboard
+
+## Features
+
+- Collect sports news from:
+  - VnExpress
+  - Thanh Nien
+  - Tuoi Tre
+- Keep only articles from the last 7 days
+- Remove duplicates with normalized URL and title similarity checks
+- Extract trending keywords
+- Rank highlighted articles using recency, source diversity, and keyword relevance
+- Generate:
+  - article summaries
+  - executive summary
+  - weekly markdown report
+- Explore the data in an interactive dashboard
+
+## Project Structure
+
+```text
+.
+├── app.py
+├── docs/
+│   └── technical_report.md
+├── reports/
+│   └── .gitkeep
+├── requirements.txt
+├── src/
+│   └── sports_news_assistant/
+│       ├── __init__.py
+│       ├── cli.py
+│       ├── config.py
+│       ├── models.py
+│       ├── pipeline.py
+│       ├── storage.py
+│       ├── ingestion/
+│       │   ├── __init__.py
+│       │   ├── article_fetcher.py
+│       │   ├── rss_collector.py
+│       │   └── selenium_fallback.py
+│       └── processing/
+│           ├── __init__.py
+│           ├── dashboard_metrics.py
+│           ├── keywords.py
+│           ├── ranking.py
+│           ├── report_builder.py
+│           └── summarizer.py
+└── tests/
+    └── test_keywords.py
+```
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Run The Pipeline
+
+Ingest the latest sports news and write the markdown report:
+
+```bash
+PYTHONPATH=src python3 -m sports_news_assistant.cli run
+```
+
+This generates:
+
+- SQLite database at `data/sports_news.db`
+- Markdown report under `reports/`
+
+## Run The Dashboard
+
+```bash
+PYTHONPATH=src streamlit run app.py
+```
+
+The dashboard includes:
+
+- Source distribution
+- Publishing trend by date
+- Top keywords
+- Highlighted articles
+- Generated executive summary
+
+## Optional Selenium Support
 
-## 1. Problem Context
+RSS is enough for the tech test, but a Selenium fallback is included for pages that require browser rendering.
 
-The objective is to design an **Intelligent Assistant** that automatically:
+To enable it:
 
-* Collects news articles from Vietnamese online newspapers
-* Filters and processes relevant information
-* Produces a **weekly summary report** for a selected domain
+```bash
+pip install selenium webdriver-manager
+```
 
-### Data Sources
+Then set:
 
-* VnExpress
-* Thanh Nien
-* Tuoi Tre
+```bash
+export ENABLE_SELENIUM_FALLBACK=true
+```
 
-### Domain Scope
+## LLM Configuration
 
-One of the following topics:
+Default summarization model:
 
-* Fashion
-* Sports
-* Entertainment
-* Technology
+```text
+Qwen/Qwen2.5-0.5B-Instruct
+```
 
-### Time Constraint
+The code tries to load the model locally with `transformers`. If model loading fails, it automatically falls back to extractive summarization so the app can still be evaluated.
 
-* Focus on **news within the last 7 days**
+Useful environment variables:
 
----
+```bash
+export SPORTS_NEWS_MODEL_ID=Qwen/Qwen2.5-0.5B-Instruct
+export SPORTS_NEWS_LOOKBACK_DAYS=7
+export SPORTS_NEWS_MAX_ARTICLES=60
+```
 
-## 2. System Objectives
+## Design Notes
 
-The system should generate a structured weekly report consisting of:
+- `RSS first` keeps collection stable and fast
+- `SQLite` is enough for a take-home test and simplifies setup
+- `TF-IDF` is easy to interpret during evaluation
+- `Streamlit` gives a quick interactive dashboard with low boilerplate
+- `LLM fallback` avoids breaking the demo when a local model is unavailable
 
-### 2.1 Executive Summary
+## Deliverables Included
 
-* High-level overview of the week's developments
-* Identification of dominant trends
-* Key events and shifts in the domain
+- Source code
+- Setup instructions
+- Technical report in [`docs/technical_report.md`](/Users/phanhieu/news_intelligent_assistant/docs/technical_report.md)
+- Sample report output path in `reports/`
 
-### 2.2 Trending Keywords
+## Notes
 
-* Extracted keywords representing:
-
-  * Topics with high frequency
-  * Emerging themes
-  * Named entities (people, organizations, products)
-
-### 2.3 Highlighted News
-
-* Curated list of important articles
-* Each item includes:
-
-  * Title
-  * Short summary
-  * Source link
-
----
-
-## 3. System Architecture
-
-### 3.1 Data Ingestion Layer
-
-**Function:**
-
-* Crawl or fetch articles from defined sources
-
-**Approaches:**
-
-* RSS feeds (preferred for stability)
-* Web scraping (fallback when RSS unavailable)
-
----
-
-### 3.2 Data Filtering Layer
-
-**Function:**
-
-* Remove irrelevant or outdated articles
-
-**Techniques:**
-
-* Time-based filtering (last 7 days)
-* Topic classification (rule-based or ML-based)
-
----
-
-### 3.3 NLP Processing Layer
-
-**Function:**
-Transform raw text into structured insights
-
-**Subcomponents:**
-
-* Tokenization & normalization
-* Keyword extraction (TF-IDF, KeyBERT, or embedding-based methods)
-* Named Entity Recognition (NER)
-* Topic clustering
-
----
-
-### 3.4 Summarization Engine
-
-**Function:**
-Generate concise summaries
-
-**Approaches:**
-
-* Extractive summarization (TextRank, LexRank)
-* Abstractive summarization (Transformer-based models, LLMs)
-
----
-
-### 3.5 Ranking & Selection Module
-
-**Function:**
-Identify “highlighted news”
-
-**Criteria:**
-
-* Source credibility
-* Article engagement (if available)
-* Keyword density / importance
-* Semantic relevance
-
----
-
-### 3.6 Report Generation Layer
-
-**Function:**
-Produce structured output
-
-**Output Format:**
-
-* Markdown / JSON / HTML
-
----
-
-## 4. Core Functionalities
-
-### 4.1 Automated News Collection
-
-* Periodic ingestion pipeline (daily or hourly)
-* Deduplication of articles
-
----
-
-### 4.2 Topic Classification
-
-* Assign each article to the selected domain
-* Optional: multi-label classification
-
----
-
-### 4.3 Keyword Extraction
-
-* Generate top-N keywords
-* Capture both frequency and semantic importance
-
----
-
-### 4.4 Summarization
-
-* Article-level summaries
-* Global summary (executive summary)
-
----
-
-### 4.5 Highlight Detection
-
-* Rank and select top-K important articles
-
----
-
-### 4.6 Report Assembly
-
-* Combine all components into final structured report
-
----
-
-## 5. Recommended Technical Stack
-
-### 5.1 Data Collection
-
-* `requests`, `BeautifulSoup`, `newspaper3k`
-* RSS parsers
-
----
-
-### 5.2 NLP & Processing
-
-* Classical:
-
-  * TF-IDF (scikit-learn)
-* Advanced:
-
-  * Sentence Transformers (semantic similarity)
-  * KeyBERT (keyword extraction)
-  * spaCy / underthesea (Vietnamese NLP)
-
----
-
-### 5.3 Summarization
-
-* Lightweight:
-
-  * TextRank
-* Advanced:
-
-  * Pretrained Transformer models
-  * LLM APIs (if allowed)
-
----
-
-### 5.4 Storage
-
-* Local: JSON / SQLite
-* Scalable: MongoDB / PostgreSQL
-
----
-
-### 5.5 Pipeline Orchestration
-
-* Simple: Python scripts + cron jobs
-* Advanced: Airflow / Prefect
-
----
-
-## 6. Design Recommendations
-
-### 6.1 Start Simple, Then Scale
-
-* Begin with:
-
-  * RSS ingestion
-  * TF-IDF keywords
-  * Extractive summarization
-* Then upgrade to:
-
-  * Embedding-based ranking
-  * LLM summarization
-
----
-
-### 6.2 Prioritize Data Quality
-
-* Deduplicate articles aggressively
-* Normalize encoding (Vietnamese text handling)
-
----
-
-### 6.3 Modular Architecture
-
-* Separate:
-
-  * Data ingestion
-  * Processing
-  * Output generation
-
-This enables:
-
-* Easier debugging
-* Independent scaling
-
----
-
-### 6.4 Evaluation Strategy
-
-* Manual validation of summaries
-* Keyword relevance checks
-* Compare extracted highlights with real trending news
-
----
-
-### 6.5 Optional Enhancements
-
-* Sentiment analysis of news
-* Trend evolution over time
-* Visualization dashboard
-
----
-
-## 7. Expected Deliverables
-
-### 7.1 Source Code
-
-* GitHub repository
-* Clear project structure
-* README with setup instructions
-
----
-
-### 7.2 Technical Report
-
-Should include:
-
-* System architecture
-* Implementation details
-* Design decisions
-* Sample weekly report output
-
----
-
-## 8. Summary
-
-This system is essentially a **pipeline combining data engineering and NLP**, with three core goals:
-
-1. **Aggregate** relevant news data
-2. **Extract** meaningful insights
-3. **Summarize** into a human-readable weekly report
-
-A well-designed solution should balance:
-
-* Simplicity (for reliability)
-* Scalability (for future extension)
-* Interpretability (for evaluation and debugging)
-
----
+- Internet access is required to fetch fresh news from the RSS feeds and article pages.
+- The project targets sports news only, as requested.
