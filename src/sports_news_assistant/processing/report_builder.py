@@ -5,11 +5,12 @@ from pathlib import Path
 
 
 def build_markdown_report(executive_summary: str, keywords: list[dict], highlights: list[dict]) -> str:
+    safe_executive_summary = (executive_summary or "").strip() or "No executive summary available."
     lines = [
         "# Weekly Sports News Report",
         "",
         "## Executive Summary",
-        executive_summary,
+        safe_executive_summary,
         "",
         "## Trending Keywords",
     ]

@@ -21,41 +21,41 @@ def run_pipeline(lookback_days: int | None = None, max_articles: int | None = No
     max_articles = max_articles or settings.max_articles
 
     storage = SQLiteStorage(settings.database_path)
-    summarizer = SportsNewsSummarizer(settings.model_id)
-    fetcher = ArticleFetcher(timeout=settings.request_timeout)
+    # summarizer = SportsNewsSummarizer(settings.model_id)
+    # fetcher = ArticleFetcher(timeout=settings.request_timeout)
 
-    rss_entries = collect_rss_entries(settings.rss_sources, lookback_days=lookback_days)
-    deduplicated = _deduplicate_entries(rss_entries)[:max_articles]
+    # rss_entries = collect_rss_entries(settings.rss_sources, lookback_days=lookback_days)
+    # deduplicated = _deduplicate_entries(rss_entries)[:max_articles]
 
-    articles: list[Article] = []
-    for entry in deduplicated:
-        content = ""
-        try:
-            content = fetcher.fetch_article_text(entry["url"])
-        except Exception:
-            if settings.enable_selenium_fallback:
-                try:
-                    content = fetch_article_with_selenium(entry["url"])
-                except Exception:
-                    content = entry["raw_summary"]
-            else:
-                content = entry["raw_summary"]
+    # articles: list[Article] = []
+    # for entry in deduplicated:
+    #     content = ""
+    #     try:
+    #         content = fetcher.fetch_article_text(entry["url"])
+    #     except Exception:
+    #         if settings.enable_selenium_fallback:
+    #             try:
+    #                 content = fetch_article_with_selenium(entry["url"])
+    #             except Exception:
+    #                 content = entry["raw_summary"]
+    #         else:
+    #             content = entry["raw_summary"]
 
-        summary = summarizer.summarize_article(content or entry["raw_summary"])
-        articles.append(
-            Article(
-                source=entry["source"],
-                title=entry["title"],
-                url=entry["url"],
-                published_at=entry["published_at"],
-                published_date=entry["published_date"],
-                raw_summary=entry["raw_summary"],
-                content=content,
-                summary=summary,
-            )
-        )
+    #     summary = summarizer.summarize_article(content or entry["raw_summary"])
+    #     articles.append(
+    #         Article(
+    #             source=entry["source"],
+    #             title=entry["title"],
+    #             url=entry["url"],
+    #             published_at=entry["published_at"],
+    #             published_date=entry["published_date"],
+    #             raw_summary=entry["raw_summary"],
+    #             content=content,
+    #             summary=summary,
+    #         )
+    #     )
 
-    storage.upsert_articles(articles)
+    # storage.upsert_articles(articles)
 
     snapshot = build_analysis_snapshot(storage=storage, lookback_days=lookback_days)
     report_content = build_markdown_report(
@@ -72,10 +72,17 @@ def build_analysis_snapshot(storage: SQLiteStorage, lookback_days: int) -> dict:
     settings = get_settings()
     summarizer = SportsNewsSummarizer(settings.model_id)
     articles = storage.fetch_recent_articles(lookback_days=lookback_days)
+    llm_filter_model_id = (
+        settings.llm_keyword_filter_model_id or settings.model_id
+        if settings.enable_llm_keyword_filter
+        else None
+    )
 
     keywords = extract_keywords(
         [f"{article['title']} {article['content']} {article['raw_summary']}" for article in articles],
         top_n=12,
+        llm_filter_model_id=llm_filter_model_id,
+        llm_filter_max_candidates=settings.llm_keyword_filter_max_candidates,
     )
     highlights = rank_highlights(articles, keywords, top_k=5)
     executive_summary = summarizer.summarize_corpus(

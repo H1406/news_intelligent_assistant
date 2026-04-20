@@ -8,6 +8,9 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     model_id: str = os.getenv("SPORTS_NEWS_MODEL_ID", "Qwen/Qwen2.5-0.5B-Instruct")
+    enable_llm_keyword_filter: bool = os.getenv("SPORTS_NEWS_ENABLE_LLM_KEYWORD_FILTER", "false").lower() == "true"
+    llm_keyword_filter_model_id: str = os.getenv("SPORTS_NEWS_KEYWORD_FILTER_MODEL_ID", "")
+    llm_keyword_filter_max_candidates: int = int(os.getenv("SPORTS_NEWS_KEYWORD_FILTER_MAX_CANDIDATES", "30"))
     lookback_days: int = int(os.getenv("SPORTS_NEWS_LOOKBACK_DAYS", "7"))
     max_articles: int = int(os.getenv("SPORTS_NEWS_MAX_ARTICLES", "60"))
     request_timeout: int = int(os.getenv("SPORTS_NEWS_REQUEST_TIMEOUT", "20"))

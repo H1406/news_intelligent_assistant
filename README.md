@@ -8,7 +8,7 @@ The implementation is intentionally simple:
 - `requests + BeautifulSoup` is used to enrich article content
 - `Selenium` is supported as an optional fallback for dynamic pages
 - `SQLite` stores the normalized articles
-- `TF-IDF` extracts trending keywords
+- `TF-IDF` extracts trending keywords with optional LLM-based noise filtering
 - `Qwen/Qwen2.5-0.5B-Instruct` is the preferred LLM for summaries
 - An extractive fallback keeps the project runnable even without a local model
 - `Streamlit + Plotly` provides the dashboard
@@ -56,12 +56,19 @@ The implementation is intentionally simple:
 │           ├── __init__.py
 │           ├── dashboard_metrics.py
 │           ├── keywords.py
+│           ├── llm_loader.py
 │           ├── ranking.py
 │           ├── report_builder.py
 │           └── summarizer.py
 └── tests/
     └── test_keywords.py
 ```
+
+Keyword filtering strategy:
+
+- Default mode keeps extraction fast: TF-IDF + stop words + heuristic cleanup.
+- Optional hybrid mode (`SPORTS_NEWS_ENABLE_LLM_KEYWORD_FILTER=true`) asks the LLM to keep only meaningful candidates from the top-ranked keyword pool.
+- If the LLM is unavailable or returns unusable output, the extractor automatically falls back to heuristic-only output.
 
 ## Setup
 
@@ -130,13 +137,16 @@ Useful environment variables:
 export SPORTS_NEWS_MODEL_ID=Qwen/Qwen2.5-0.5B-Instruct
 export SPORTS_NEWS_LOOKBACK_DAYS=7
 export SPORTS_NEWS_MAX_ARTICLES=60
+export SPORTS_NEWS_ENABLE_LLM_KEYWORD_FILTER=false
+export SPORTS_NEWS_KEYWORD_FILTER_MODEL_ID=
+export SPORTS_NEWS_KEYWORD_FILTER_MAX_CANDIDATES=30
 ```
 
 ## Design Notes
 
 - `RSS first` keeps collection stable and fast
 - `SQLite` is enough for a take-home test and simplifies setup
-- `TF-IDF` is easy to interpret during evaluation
+- `TF-IDF + optional LLM reranking` keeps extraction interpretable while reducing noisy generic terms
 - `Streamlit` gives a quick interactive dashboard with low boilerplate
 - `LLM fallback` avoids breaking the demo when a local model is unavailable
 

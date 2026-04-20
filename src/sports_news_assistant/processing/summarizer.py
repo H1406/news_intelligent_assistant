@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from functools import lru_cache
+import re
+
+from sports_news_assistant.processing.llm_loader import load_text_generator
 
 
 class SportsNewsSummarizer:
@@ -19,8 +21,8 @@ class SportsNewsSummarizer:
             ),
             max_new_tokens=120,
         )
-        if llm_summary:
-            return llm_summary
+        if self._is_usable_summary(llm_summary, min_alpha_chars=25):
+            return llm_summary  # type: ignore[return-value]
         return self._extractive_summary(text, max_sentences=max_sentences)
 
     def summarize_corpus(self, texts: list[str]) -> str:
@@ -37,14 +39,14 @@ class SportsNewsSummarizer:
             ),
             max_new_tokens=180,
         )
-        if llm_summary:
-            return llm_summary
+        if self._is_usable_summary(llm_summary, min_alpha_chars=40):
+            return llm_summary  # type: ignore[return-value]
 
         return self._extractive_summary(joined, max_sentences=4)
 
     def _summarize_with_llm(self, prompt: str, max_new_tokens: int) -> str | None:
         try:
-            generator = _load_generator(self.model_id)
+            generator = load_text_generator(self.model_id)
         except Exception:
             return None
 
@@ -63,12 +65,30 @@ class SportsNewsSummarizer:
     def _extractive_summary(text: str, max_sentences: int = 2) -> str:
         sentences = [segment.strip() for segment in text.replace("\n", " ").split(".") if len(segment.strip()) > 30]
         if not sentences:
-            return text[:240].strip()
-        return ". ".join(sentences[:max_sentences]).strip() + "."
+            fallback = text[:240].strip()
+            return fallback or "No summary available."
+        summary = ". ".join(sentences[:max_sentences]).strip()
+        return (summary + ".") if summary else "No summary available."
 
+    @staticmethod
+    def _is_usable_summary(text: str | None, min_alpha_chars: int) -> bool:
+        if text is None:
+            return False
 
-@lru_cache(maxsize=1)
-def _load_generator(model_id: str):
-    from transformers import pipeline
+        summary = text.strip()
+        if len(summary) < 30:
+            return False
+        if re.search(r"(.)\1{10,}", summary):
+            return False
+        if re.fullmatch(r"[\W_]+", summary):
+            return False
 
-    return pipeline("text-generation", model=model_id, tokenizer=model_id)
+        alpha_count = sum(char.isalpha() for char in summary)
+        if alpha_count < min_alpha_chars:
+            return False
+
+        punctuation_count = sum(char in "!?:;,.-" for char in summary)
+        if punctuation_count / max(len(summary), 1) > 0.35:
+            return False
+
+        return True
